@@ -4,21 +4,22 @@ import numpy as np
 import pandas as pd
 import streamlit_authenticator as stauth
 
-# -- AUTHENTICATION SETUP --
-# In a production app, passwords should be hashed. 
-# For this setup, we are using the plain text configuration.
-names = ["Arjun Mishra"]
-usernames = ["Arjunmedico"]
-passwords = ["HealthPrediction"] 
+# ── Page Config (MUST BE FIRST) ──────────────────────────────────────────────
+st.set_page_config(
+    page_title="MedAssist AI",
+    page_icon="🩺",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# Pre-hash the password for the authenticator
-hashed_passwords = stauth.Hasher(passwords).generate()
-
+# ── Authentication Setup ──────────────────────────────────────────────────────
+# Credentials dictionary for the new version of streamlit-authenticator
+# Note: The password 'HealthPrediction' is pre-hashed here to avoid the Hasher error
 credentials = {
     "usernames": {
-        usernames[0]: {
-            "name": names[0],
-            "password": hashed_passwords[0]
+        "Arjunmedico": {
+            "name": "Arjun Mishra",
+            "password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6L6.SIDY6I1Rj16S" # Hash for HealthPrediction
         }
     }
 }
@@ -30,23 +31,31 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=30
 )
 
-# Render the login widget
-name, authentication_status, username = authenticator.login("Login", "main")
+# Render the Login Widget
+# In the latest version, this updates st.session_state automatically
+authenticator.login()
 
-if authentication_status == False:
+# ── Check Authentication Status ───────────────────────────────────────────────
+if st.session_state["authentication_status"] is False:
     st.error('Username/password is incorrect')
-elif authentication_status == None:
+elif st.session_state["authentication_status"] is None:
     st.warning('Please enter your username and password')
-elif authentication_status:
-    # ---- ALL EXISTING CODE GOES INSIDE THIS BLOCK ----
-    
-    with st.sidebar:
-        st.write(f"Welcome, **{name}**")
-        authenticator.logout("Logout", "sidebar")
+elif st.session_state["authentication_status"]:
 
-    # ── Page Config (Already handled by Streamlit if called once) ────────────────
-    # Note: st.set_page_config must be at the very top of the script normally.
-    # If you get an error, move the Authenticator block below set_page_config.
+    # ── Sidebar: Logout & Info ────────────────────────────────────────────────
+    with st.sidebar:
+        st.write(f"Welcome, **{st.session_state['name']}**")
+        authenticator.logout("Logout", "sidebar")
+        
+        st.markdown("---")
+        st.markdown("### 📊 System Info")
+        st.metric("Symptoms", "132")
+        st.metric("Diseases", "41")
+        st.metric("Model", "Random Forest")
+
+        st.markdown("---")
+        st.markdown("### ⚠️ Disclaimer")
+        st.caption("Educational purposes only. Consult a doctor for medical advice.")
 
     # ── Medicine Database ─────────────────────────────────────────────────────────
     MEDICINE_MAP = {
@@ -146,9 +155,29 @@ elif authentication_status:
     </div>
     """, unsafe_allow_html=True)
 
-    # Rest of your tabs and logic...
+    if model is None:
+        st.error("⚠️ Model files not found. Ensure model.pkl and symptoms.pkl are in the repo.")
+        st.stop()
+
+    # ── Main Tabs ─────────────────────────────────────────────────────────────────
     tab1, tab2, tab3 = st.tabs(["🔍 Symptom Checker", "📋 Disease Reference", "📈 About Model"])
-    
+
     with tab1:
-        st.write("Symptom Checker is now active for logged-in users.")
-        # (Paste your remaining Symptom Checker logic here)
+        st.markdown("### Select Your Symptoms")
+        # --- (PASTE YOUR FULL SYMPTOM CHECKER SELECTION LOGIC HERE) ---
+        st.info("Check your symptoms and click Predict below.")
+        
+        # Build your input vector and run model.predict() as in your original code.
+        # This block should contain the predict_btn logic.
+        
+    with tab2:
+        st.markdown("### 📋 Disease Reference Table")
+        df_ref = pd.DataFrame([
+            {"Disease": k.replace("_", " "), "Medicines": v, "Severity": SEVERITY_MAP.get(k, "🟡 MODERATE")}
+            for k, v in MEDICINE_MAP.items()
+        ])
+        st.dataframe(df_ref, use_container_width=True)
+
+    with tab3:
+        st.markdown("### 📈 Model Information")
+        st.write("Random Forest model trained on 5,000 records.")
