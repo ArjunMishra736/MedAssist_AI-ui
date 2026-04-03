@@ -1,1 +1,5 @@
-git-lfs
+streamlit
+pandas
+numpy
+scikit-learn
+streamlit-authenticator
