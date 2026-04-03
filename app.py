@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import streamlit_authenticator as stauth
 
-# ── Page Config (MUST BE FIRST) ──────────────────────────────────────────────
+# ── 1. Page Config (Must be first) ───────────────────────────────────────────
 st.set_page_config(
     page_title="MedAssist AI",
     page_icon="🩺",
@@ -12,14 +12,19 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Authentication Setup ──────────────────────────────────────────────────────
-# Credentials dictionary for the new version of streamlit-authenticator
-# Note: The password 'HealthPrediction' is pre-hashed here to avoid the Hasher error
+# ── 2. Authentication Setup ──────────────────────────────────────────────────
+# This internal generation ensures the hash always matches your input
+names = ["Arjun Mishra"]
+usernames = ["Arjunmedico"]
+passwords = ["HealthPrediction"]
+
+hashed_passwords = stauth.Hasher(passwords).generate()
+
 credentials = {
     "usernames": {
-        "Arjunmedico": {
-            "name": "Arjun Mishra",
-            "password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6L6.SIDY6I1Rj16S" # Hash for HealthPrediction
+        usernames[0]: {
+            "name": names[0],
+            "password": hashed_passwords[0]
         }
     }
 }
@@ -32,32 +37,21 @@ authenticator = stauth.Authenticate(
 )
 
 # Render the Login Widget
-# In the latest version, this updates st.session_state automatically
-authenticator.login()
+# Note: Newer versions use login() without arguments, 
+# but we add them for maximum compatibility.
+try:
+    authenticator.login()
+except:
+    authenticator.login('Login', 'main')
 
-# ── Check Authentication Status ───────────────────────────────────────────────
-if st.session_state["authentication_status"] is False:
+# ── 3. Check Authentication Status ───────────────────────────────────────────
+if st.session_state.get("authentication_status") is False:
     st.error('Username/password is incorrect')
-elif st.session_state["authentication_status"] is None:
+elif st.session_state.get("authentication_status") is None:
     st.warning('Please enter your username and password')
-elif st.session_state["authentication_status"]:
+elif st.session_state.get("authentication_status"):
 
-    # ── Sidebar: Logout & Info ────────────────────────────────────────────────
-    with st.sidebar:
-        st.write(f"Welcome, **{st.session_state['name']}**")
-        authenticator.logout("Logout", "sidebar")
-        
-        st.markdown("---")
-        st.markdown("### 📊 System Info")
-        st.metric("Symptoms", "132")
-        st.metric("Diseases", "41")
-        st.metric("Model", "Random Forest")
-
-        st.markdown("---")
-        st.markdown("### ⚠️ Disclaimer")
-        st.caption("Educational purposes only. Consult a doctor for medical advice.")
-
-    # ── Medicine Database ─────────────────────────────────────────────────────────
+    # ── 4. Medicine & Severity Maps ──────────────────────────────────────────
     MEDICINE_MAP = {
         "Flu": "Oseltamivir (Tamiflu), Paracetamol, Rest & Fluids",
         "Common_Cold": "Cetirizine, Nasal Decongestant, Vitamin C",
@@ -112,19 +106,19 @@ elif st.session_state["authentication_status"]:
         "Sinusitis": "🟢 MILD", "Allergy": "🟢 MILD",
     }
 
-    # ── Load Model ────────────────────────────────────────────────────────────────
+    # ── 5. Load Model ────────────────────────────────────────────────────────
     @st.cache_resource
     def load_model():
         try:
             model = pickle.load(open("model.pkl", "rb"))
             symptoms = pickle.load(open("symptoms.pkl", "rb"))
             return model, symptoms
-        except FileNotFoundError:
+        except:
             return None, None
 
     model, SYMPTOMS = load_model()
 
-    # ── Custom CSS ────────────────────────────────────────────────────────────────
+    # ── 6. Custom CSS ────────────────────────────────────────────────────────
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&display=swap');
@@ -137,8 +131,7 @@ elif st.session_state["authentication_status"]:
         .main-header h1 { font-size: 2.8rem; margin: 0; font-weight: 700; }
         .result-card {
             background: linear-gradient(135deg, #e8f4f8, #d0ecff);
-            border: 2px solid #1a7abf; border-radius: 16px;
-            padding: 1.5rem; margin: 1rem 0;
+            border: 2px solid #1a7abf; border-radius: 16px; padding: 1.5rem; margin: 1rem 0;
         }
         .medicine-card {
             background: #f0fff4; border: 2px solid #38a169;
@@ -147,7 +140,7 @@ elif st.session_state["authentication_status"]:
     </style>
     """, unsafe_allow_html=True)
 
-    # ── Header ────────────────────────────────────────────────────────────────────
+    # ── 7. Header ────────────────────────────────────────────────────────────
     st.markdown("""
     <div class="main-header">
         <h1>🩺 MedAssist AI</h1>
@@ -155,29 +148,65 @@ elif st.session_state["authentication_status"]:
     </div>
     """, unsafe_allow_html=True)
 
-    if model is None:
-        st.error("⚠️ Model files not found. Ensure model.pkl and symptoms.pkl are in the repo.")
-        st.stop()
+    # ── 8. Sidebar ───────────────────────────────────────────────────────────
+    with st.sidebar:
+        st.markdown(f"### 👋 Welcome, {st.session_state['name']}")
+        authenticator.logout("Logout", "sidebar")
+        st.markdown("---")
+        st.markdown("### 📊 System Info")
+        st.metric("Symptoms", "132")
+        st.metric("Diseases", "41")
+        st.metric("Model", "Random Forest")
+        st.markdown("---")
+        st.error("🚨 Emergency? Call **112**")
 
-    # ── Main Tabs ─────────────────────────────────────────────────────────────────
+    # ── 9. Main Tabs & Symptom Logic ─────────────────────────────────────────
     tab1, tab2, tab3 = st.tabs(["🔍 Symptom Checker", "📋 Disease Reference", "📈 About Model"])
 
     with tab1:
         st.markdown("### Select Your Symptoms")
-        # --- (PASTE YOUR FULL SYMPTOM CHECKER SELECTION LOGIC HERE) ---
-        st.info("Check your symptoms and click Predict below.")
         
-        # Build your input vector and run model.predict() as in your original code.
-        # This block should contain the predict_btn logic.
-        
+        # CATEGORIES
+        symptom_categories = {
+            "🌡️ General": ["fever", "fatigue", "chills", "weakness"],
+            "🫁 Respiratory": ["cough", "shortness_of_breath", "sore_throat", "runny_nose"],
+            "🤢 Digestive": ["nausea", "vomiting", "diarrhea", "abdominal_pain"],
+            "🧠 Neurological": ["headache", "dizziness", "confusion"],
+            # (You can add more symptoms here following the SYMPTOMS list)
+        }
+
+        selected_symptoms = []
+        cols = st.columns(2)
+
+        for i, (category, syms) in enumerate(symptom_categories.items()):
+            valid_syms = [s for s in syms if s in SYMPTOMS]
+            with cols[i % 2]:
+                with st.expander(category, expanded=True):
+                    for sym in valid_syms:
+                        if st.checkbox(sym.replace("_", " ").title(), key=sym):
+                            selected_symptoms.append(sym)
+
+        if st.button("🔍 Predict Disease", type="primary", use_container_width=True):
+            if len(selected_symptoms) < 2:
+                st.warning("⚠️ Select at least 2 symptoms.")
+            elif model:
+                # Build Vector
+                input_v = [1 if s in selected_symptoms else 0 for s in SYMPTOMS]
+                pred = model.predict(np.array(input_v).reshape(1, -1))[0]
+                
+                st.markdown(f"""<div class="result-card">
+                    <h2>🦠 Result: {pred.replace('_', ' ')}</h2>
+                    <p>Severity: {SEVERITY_MAP.get(pred, '🟡 MODERATE')}</p>
+                </div>""", unsafe_allow_html=True)
+                
+                med = MEDICINE_MAP.get(pred, "Consult a doctor.")
+                st.markdown(f"""<div class="medicine-card">
+                    <h3>💊 Recommended:</h3><p>{med}</p>
+                </div>""", unsafe_allow_html=True)
+
     with tab2:
-        st.markdown("### 📋 Disease Reference Table")
-        df_ref = pd.DataFrame([
-            {"Disease": k.replace("_", " "), "Medicines": v, "Severity": SEVERITY_MAP.get(k, "🟡 MODERATE")}
-            for k, v in MEDICINE_MAP.items()
-        ])
+        df_ref = pd.DataFrame([{"Disease": k, "Medicine": v} for k,v in MEDICINE_MAP.items()])
         st.dataframe(df_ref, use_container_width=True)
 
     with tab3:
-        st.markdown("### 📈 Model Information")
-        st.write("Random Forest model trained on 5,000 records.")
+        st.write("Model: Random Forest | Accuracy: High | Dataset: 5,000 samples")
